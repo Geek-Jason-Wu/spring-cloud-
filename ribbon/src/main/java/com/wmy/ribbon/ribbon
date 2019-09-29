@@ -1,0 +1,101 @@
+##
+   Spring Cloud Ribbon是一个基于Http和Tcp的1客户端负载均衡工具，它基于Netflix Ribbon实现。通过Spring Cloud封装，
+可以很轻松地将面向服务的rest模板请求自动转换成客户端负载均衡的服务调用。因为微服务间的调用，API网关的请求转发等
+内容，实际上都是通过Ribbon来实现的，包括Feign,他是基于Ribbon实现的工具。
+##
+   - 客户端负载均衡
+        负载均衡在系统架构中是一个非常重要，并且不得不去实施的内容。因为负载均衡是对系统的高可用、网络压力的缓解
+     和处理能力扩容的重要手段之一。我们通常所说的负载均衡都是指的服务端负载均衡，比如F5（Load Balance）等，而软
+     件负载均衡则是通过在服务器上安装一些具有负载均衡功能或模块的软件来完成请求分发工作(例如nginx)。
+     
+   - 不管是硬件负载均衡的设备还是软件负载均衡的软件模块都会维护一个下挂可用的服务端清单，通过心跳检测来剔除故障
+   的服务端节点以保证清单中都是可以正常访问的服务端节点。当客户端发送请求到负载均衡设备时，该设备按照某种算法从
+   维护的可用服务端清单中驱虎一台服务端的地址然后进行转发。
+   
+   - 客户端负载均衡和服务端负载均衡最大的不同在于上面提到的服务清单所存储的位置。在客户端负载均衡中，所有客户端
+   节点都维护这自己要访问的服务端清单，而这些服务端的清单来自于服务注册中心。同服务端的负载均衡的架构类似，在客
+   户端负载均衡中也需要心跳去维护服务端清单的健康性，只是这个步骤需要与服务注册中心配合完成。
+   
+   - 通过spring cloud Ribbon的封装，我们在微服务架构中使用客户端负载均衡调用非常简单，只要以下两步：
+          1、服务提供者只需要启动多个服务实例并注册到一个注册中心或是多个相关联的服务注册中心，
+          2、服务消费者直接通过调用被@LoadBalance注解修饰过的RestTemplate来实现面向服务的接口调用。
+          
+##
+####RestTemplate详解,针对几种不同请求类型和参数类型的服务调用实现
+
+   #####GET请求：对get请求可以通过以下两种方式进行调用实现
+   - getForEntity函数，该方法返回ResponseEntity,该对象是spring对http请求响应的封装，主要存储了http的几个重
+   要元素 	
+~~~
+    url ： 接口地址
+    responseType ：返回数据类型，可自定义类型、
+    uriVariables ： 接口的扩展参数，可以通过数组或者Map来包装
+    public <T> ResponseEntity<T> getForEntity(String url, Class<T> responseType, Object... uriVariables)
+            throws RestClientException {
+            RequestCallback requestCallback = acceptHeaderRequestCallback(responseType);
+            ResponseExtractor<ResponseEntity<T>> responseExtractor = responseEntityExtractor(responseType);
+            return nonNull(execute(url, HttpMethod.GET, requestCallback, responseExtractor, uriVariables));
+    }
+~~~
+   - getForObject函数，该方法可以理解为对getForEntity函数的进一步封装，他通过HttpMessageConverterExtractor对http
+   的请求响应体body内容进行对象转换。实现请求直接返回包装好的对象内容
+~~~
+    url ： 接口地址
+    responseType ：返回数据类型，可自定义类型、
+    uriVariables ： 接口的扩展参数
+    public <T> T getForObject(String url, Class<T> responseType, Object... uriVariables) 
+            throws RestClientException {
+            RequestCallback requestCallback = acceptHeaderRequestCallback(responseType);
+            HttpMessageConverterExtractor<T> responseExtractor =
+                    new HttpMessageConverterExtractor<>(responseType, getMessageConverters(), logger);
+            return execute(url, HttpMethod.GET, requestCallback, responseExtractor, uriVariables);
+    }
+~~~
+   #####POST请求：对post请求可以通过以下三种方式进行调用实现
+   - postForEntity函数，该方法同get请求中的getForEntity类似，会在调用后返回ResponseEntity<T>对象，其中T为请求响应
+   的body类型
+~~~
+    public <T> ResponseEntity<T> postForEntity(String url, @Nullable Object request,
+                Class<T> responseType, Object... uriVariables) throws RestClientException {
+            RequestCallback requestCallback = httpEntityCallback(request, responseType);
+            ResponseExtractor<ResponseEntity<T>> responseExtractor = responseEntityExtractor(responseType);
+            return nonNull(execute(url, HttpMethod.POST, requestCallback, responseExtractor, uriVariables));
+    }
+~~~
+   - postForObject函数，该方法也跟getForObject函数类似，他的作用是简化了postForEntity函数的后续处理，可以直接将请求
+   响应的body内容包装成对象来返回使用。
+~~~
+    public <T> T postForObject(String url, @Nullable Object request, Class<T> responseType,
+                Object... uriVariables) throws RestClientException {
+            RequestCallback requestCallback = httpEntityCallback(request, responseType);
+            HttpMessageConverterExtractor<T> responseExtractor =
+                    new HttpMessageConverterExtractor<>(responseType, getMessageConverters(), logger);
+            return execute(url, HttpMethod.POST, requestCallback, responseExtractor, uriVariables);
+    }
+~~~
+   - postForLocation函数，该方法实现了以POST请求提交资源，并返回新资源的URI。
+~~~
+    request ：请求体，可以为空，可以传一对象作为参数
+	public URI postForLocation(String url, @Nullable Object request, Object... uriVariables)
+			throws RestClientException {
+		RequestCallback requestCallback = httpEntityCallback(request);
+		HttpHeaders headers = execute(url, HttpMethod.POST, requestCallback, headersExtractor(), uriVariables);
+		return (headers != null ? headers.getLocation() : null);
+	}
+~~~
+   #####PUT请求，对put请求可以通过put方法进行调用实现
+~~~
+	public void put(String url, @Nullable Object request, Object... uriVariables)
+			throws RestClientException {
+		RequestCallback requestCallback = httpEntityCallback(request);
+		execute(url, HttpMethod.PUT, requestCallback, null, uriVariables);
+	}
+~~~
+   #####DELETE请求，对delete请求可以通过delete方法进行调用实现
+~~~
+    delete请求时通常可以将唯一标识拼接在URL上，就不需要request中body信息了
+	public void delete(URI url) throws RestClientException {
+		execute(url, HttpMethod.DELETE, null, null);
+	}
+~~~
+    

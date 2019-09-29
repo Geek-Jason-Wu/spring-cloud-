@@ -1,0 +1,29 @@
+server:
+  port: 8801
+
+spring:
+  application:
+    name: api-gateway
+
+# 传统路由方式
+#zuul:
+#  routes:
+#    # 当访问该地址时http://localhost:8801/hello-service/hello,routes会议地址的hello-service进行匹配，匹配成功后进行路由转发调用具体服务的接口
+#    # 最终调用地址为http://localhost:1111/hello
+#    hello-service:
+#      path: /hello-service/** # 所有请求路径中有hello1的地址都会调用下面url进行路由转发
+#      url: http://localhost:1111/
+
+
+# 面向服务的路由
+# zuul也注册到eureka注册中心
+zuul:
+  routes:
+    hello-service:
+      parh: /hello-service/**
+      serviceId: hello-service
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8080/eureka # eureka服务注册中心地址

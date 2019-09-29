@@ -1,0 +1,6 @@
+##消息驱动
+        spring cloud stream是一个用来为微服务应用构建消息驱动能力的框架，他可以基于spring boot来创建独立的
+    、可用于生产的spring应用程序。他通过使用spring Integration来连接消息代理中间件以实现消息事件驱动。
+        spring cloud stream本质上就是整合了spring boot和spring integration,实现了一套轻量级的消息驱动的微
+    服务框架。
+        目前为止，spring cloud stream只支持Rabbit MQ 和 kafka这两个消息中间件的自动化配置。
